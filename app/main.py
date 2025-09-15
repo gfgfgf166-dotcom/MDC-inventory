@@ -62,3 +62,10 @@ def add_product(
     db.commit()
     db.refresh(new_item)
     return {"message": "Product added successfully", "product": {"barcode": barcode, "name": name, "quantity": quantity}}
+    
+    try:
+    with engine.connect() as conn:
+        result = conn.execute("SELECT 1")
+        print("Database connection OK:", result.scalar())
+except Exception as e:
+    print("Database connection failed:", e)
