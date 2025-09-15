@@ -5,13 +5,19 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
-print("DATABASE_URL =", os.getenv("DATABASE_URL"))
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 
 # -----------------------------
 # DATABASE SETUP
 # -----------------------------
-DATABASE_URL = os.getenv("DATABASE_URL")  # Make sure this is the public Railway Postgres URL
+DATABASE_URL = os.getenv("DATABASE_URL").strip()  # remove whitespace/newlines
+# Ensure the URL uses postgresql://, not postgres://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+print("DATABASE_URL =", DATABASE_URL)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
