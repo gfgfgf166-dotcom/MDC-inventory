@@ -5,6 +5,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
+print("DATABASE_URL =", os.getenv("DATABASE_URL"))
+
 
 # -----------------------------
 # DATABASE SETUP
