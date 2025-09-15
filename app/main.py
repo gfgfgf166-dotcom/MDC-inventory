@@ -1,18 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException
+# app/main.py
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from pydantic import BaseModel
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
 
-# --- Database setup ---
-DATABASE_URL = os.getenv("DATABASE_URL")
+# -----------------------------
+# DATABASE SETUP
+# -----------------------------
+DATABASE_URL = os.getenv("DATABASE_URL")  # Make sure this is the public Railway Postgres URL
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- Model ---
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
@@ -20,12 +22,10 @@ class Product(Base):
     name = Column(String)
     quantity = Column(Integer)
 
+# Create tables automatically
 Base.metadata.create_all(bind=engine)
 
-# --- App ---
-app = FastAPI()
-
-# --- Dependency ---
+# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -33,22 +33,30 @@ def get_db():
     finally:
         db.close()
 
-# --- Schema ---
-class ProductCreate(BaseModel):
-    barcode: str
-    name: str
-    quantity: int
+# -----------------------------
+# FASTAPI APP
+# -----------------------------
+app = FastAPI()
+templates = Jinja2Templates(directory="app/templates")  # Make sure index.html is here
 
-# --- Add product endpoint ---
+# Serve HTML form at /
+@app.get("/", response_class=HTMLResponse)
+def read_form(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# POST endpoint to add products
 @app.post("/product")
-def add_product(product: ProductCreate, db: Session = Depends(get_db)):
-    # check if barcode already exists
-    existing = db.query(Product).filter(Product.barcode == product.barcode).first()
+def add_product(
+    barcode: str = Form(...),
+    name: str = Form(...),
+    quantity: int = Form(...),
+    db: Session = next(get_db())
+):
+    existing = db.query(Product).filter(Product.barcode == barcode).first()
     if existing:
         raise HTTPException(status_code=400, detail="Barcode already exists")
-
-    new_item = Product(**product.dict())
+    new_item = Product(barcode=barcode, name=name, quantity=quantity)
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
-    return {"message": "Product added", "product": product.dict()}
+    return {"message": "Product added successfully", "product": {"barcode": barcode, "name": name, "quantity": quantity}}
