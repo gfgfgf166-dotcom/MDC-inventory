@@ -63,7 +63,7 @@ def add_product(
     db.refresh(new_item)
     return {"message": "Product added successfully", "product": {"barcode": barcode, "name": name, "quantity": quantity}}
     
-    try:
+try:
     with engine.connect() as conn:
         result = conn.execute("SELECT 1")
         print("Database connection OK:", result.scalar())
