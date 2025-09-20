@@ -30,7 +30,7 @@ Base.metadata.create_all(bind=engine)
 # FastAPI setup
 # ---------------------------
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="app/templates")
 
 # ---------------------------
 # Cloudflare R2 setup
