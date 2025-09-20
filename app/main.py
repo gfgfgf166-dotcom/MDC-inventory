@@ -1,39 +1,46 @@
-# app/main.py
-from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from fastapi import FastAPI, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import Column, Integer, String, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
 
-# -----------------------------
-# DATABASE SETUP
-# -----------------------------
-DATABASE_URL = os.getenv("DATABASE_URL").strip()  # remove whitespace/newlines
-# Ensure the URL uses postgresql://, not postgres://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# -------------------------------------------------------------------
+# Database models
+# -------------------------------------------------------------------
+class Item(Base):
+    __tablename__ = "items"
 
-print("DATABASE_URL =", DATABASE_URL)
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class Product(Base):
-    __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
-    barcode = Column(String, unique=True, index=True)
-    name = Column(String)
-    quantity = Column(Integer)
+    barcode = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
 
-# Create tables automatically
+
+# Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-# Dependency to get DB session
+
+# -------------------------------------------------------------------
+# Pydantic schemas
+# -------------------------------------------------------------------
+class ItemCreate(BaseModel):
+    barcode: str
+    name: str
+
+
+class ItemResponse(BaseModel):
+    id: int
+    barcode: str
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
+# -------------------------------------------------------------------
+# Dependency
+# -------------------------------------------------------------------
 def get_db():
     db = SessionLocal()
     try:
@@ -41,37 +48,29 @@ def get_db():
     finally:
         db.close()
 
-# -----------------------------
-# FASTAPI APP
-# -----------------------------
-app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")  # Make sure index.html is here
 
-# Serve HTML form at /
-@app.get("/", response_class=HTMLResponse)
-def read_form(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# -------------------------------------------------------------------
+# FastAPI app
+# -------------------------------------------------------------------
+app = FastAPI(title="Barcode Inventory API")
 
-# POST endpoint to add products
-@app.post("/product")
-def add_product(
-    barcode: str = Form(...),
-    name: str = Form(...),
-    quantity: int = Form(...),
-    db: Session = next(get_db())
-):
-    existing = db.query(Product).filter(Product.barcode == barcode).first()
-    if existing:
+
+@app.post("/add", response_model=ItemResponse)
+def add_item(item: ItemCreate, db: Session = Depends(get_db)):
+    db_item = db.query(Item).filter(Item.barcode == item.barcode).first()
+    if db_item:
         raise HTTPException(status_code=400, detail="Barcode already exists")
-    new_item = Product(barcode=barcode, name=name, quantity=quantity)
+
+    new_item = Item(barcode=item.barcode, name=item.name)
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
-    return {"message": "Product added successfully", "product": {"barcode": barcode, "name": name, "quantity": quantity}}
-    
-try:
-    with engine.connect() as conn:
-        result = conn.execute("SELECT 1")
-        print("Database connection OK:", result.scalar())
-except Exception as e:
-    print("Database connection failed:", e)
+    return new_item
+
+
+@app.get("/search/{barcode}", response_model=ItemResponse)
+def search_item(barcode: str, db: Session = Depends(get_db)):
+    db_item = db.query(Item).filter(Item.barcode == barcode).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return db_item
