@@ -1,5 +1,6 @@
 import os
 import shutil
+import uuid
 from fastapi import FastAPI, Request, Form, Depends, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -59,6 +60,8 @@ def get_db():
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
 @app.post("/add-form", response_class=HTMLResponse)
 def add_item_form(
     request: Request,
@@ -67,22 +70,41 @@ def add_item_form(
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
+    # Check if barcode already exists
     db_item = db.query(Item).filter(Item.barcode == barcode).first()
     if db_item:
         return templates.TemplateResponse("index.html", {"request": request, "message": "❌ Barcode already exists"})
 
     image_path = None
     if image:
-        file_location = f"app/static/images/{image.filename}"
+        # Validate file extension
+        ext = os.path.splitext(image.filename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        # Generate unique filename
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+        file_location = f"app/static/images/{unique_name}"
+
+        # Ensure folder exists
+        os.makedirs(os.path.dirname(file_location), exist_ok=True)
+
+        # Save file
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(image.file, buffer)
-        image_path = f"/static/images/{image.filename}"
 
+        image_path = f"/static/images/{unique_name}"
+
+    # Add item to database
     new_item = Item(barcode=barcode, name=name, image_path=image_path)
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
-    return templates.TemplateResponse("index.html", {"request": request, "message": f"✅ Added {name} (Barcode: {barcode})", "image_path": image_path})
+
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "message": f"✅ Added {name} (Barcode: {barcode})", "image_path": image_path}
+    )
 
 @app.post("/search-form", response_class=HTMLResponse)
 def search_item_form(
@@ -90,7 +112,19 @@ def search_item_form(
     barcode: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    # Find item by barcode
     db_item = db.query(Item).filter(Item.barcode == barcode).first()
     if not db_item:
-        return templates.TemplateResponse("index.html", {"request": request, "message": "❌ Item not found"})
-    return templates.TemplateResponse("index.html", {"request": request, "message": f"🔎 Found: {db_item.name} (Barcode: {db_item.barcode})", "image_path": db_item.image_path})
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request, "message": "❌ Item not found"}
+        )
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "message": f"🔎 Found: {db_item.name} (Barcode: {db_item.barcode})",
+            "image_path": db_item.image_path  # pass image path to template
+        }
+    )
