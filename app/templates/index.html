@@ -6,7 +6,7 @@
         body { font-family: Arial, sans-serif; margin: 40px; }
         h1 { color: #333; }
         form { margin-bottom: 20px; }
-        input[type=text] { padding: 5px; margin: 5px; }
+        input[type=text], input[type=file] { padding: 5px; margin: 5px; }
         input[type=submit] { padding: 5px 10px; }
         .message { margin-top: 20px; font-weight: bold; }
     </style>
@@ -15,9 +15,10 @@
     <h1>Barcode Inventory System</h1>
 
     <h2>Add Item</h2>
-    <form action="/add-form" method="post">
+    <form action="/add-form" method="post" enctype="multipart/form-data">
         <input type="text" name="barcode" placeholder="Barcode" required>
         <input type="text" name="name" placeholder="Item Name" required>
+        <input type="file" name="image" accept="image/*">
         <input type="submit" value="Add">
     </form>
 
@@ -29,6 +30,11 @@
 
     {% if message %}
         <div class="message">{{ message }}</div>
+    {% endif %}
+
+    {% if image_path %}
+        <h3>Item Image:</h3>
+        <img src="{{ image_path }}" alt="Item Image" width="200">
     {% endif %}
 </body>
 </html>
