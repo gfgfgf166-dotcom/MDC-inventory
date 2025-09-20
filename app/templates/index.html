@@ -9,10 +9,10 @@
     <!-- Form to add new item -->
     <form action="/add-form" method="post" enctype="multipart/form-data">
         <label>Barcode:</label>
-        <input type="text" name="barcode" required><br>
+        <input type="text" name="barcode"><br>
         
         <label>Name:</label>
-        <input type="text" name="name" required><br>
+        <input type="text" name="name"><br>
         
         <label>Image:</label>
         <input type="file" name="image" accept="image/*"><br>
@@ -25,10 +25,26 @@
         <p>{{ message }}</p>
     {% endif %}
 
-    <!-- Display uploaded image -->
-    {% if image_path %}
-        <h2>Uploaded Image:</h2>
-        <img src="{{ image_path }}" alt="Uploaded Image" width="200">
-    {% endif %}
+    <h2>Existing Items</h2>
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>Barcode</th>
+            <th>Name</th>
+            <th>Image</th>
+        </tr>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.barcode }}</td>
+            <td>{{ item.name }}</td>
+            <td>
+                {% if item.image_url %}
+                    <img src="{{ item.image_url }}" alt="Item Image" width="100">
+                {% else %}
+                    No Image
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 </body>
 </html>
