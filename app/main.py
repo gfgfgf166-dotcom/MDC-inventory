@@ -60,20 +60,24 @@ def get_db():
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 @app.post("/add-form", response_class=HTMLResponse)
-def add_item_form(
+async def add_item_form(
     request: Request,
     barcode: str = Form(...),
     name: str = Form(...),
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    # Check if barcode already exists
+    # Check duplicate barcode
     db_item = db.query(Item).filter(Item.barcode == barcode).first()
     if db_item:
-        return templates.TemplateResponse("index.html", {"request": request, "message": "❌ Barcode already exists"})
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request, "message": "❌ Barcode already exists"}
+        )
 
     image_path = None
     if image:
@@ -81,6 +85,11 @@ def add_item_form(
         ext = os.path.splitext(image.filename)[1].lower()
         if ext not in ALLOWED_EXTENSIONS:
             raise HTTPException(status_code=400, detail="Unsupported file type")
+
+        # Read contents and check size
+        contents = await image.read()
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File too large (max 5MB)")
 
         # Generate unique filename
         unique_name = f"{uuid.uuid4().hex}{ext}"
@@ -90,8 +99,8 @@ def add_item_form(
         os.makedirs(os.path.dirname(file_location), exist_ok=True)
 
         # Save file
-        with open(file_location, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
+        with open(file_location, "wb") as f:
+            f.write(contents)
 
         image_path = f"/static/images/{unique_name}"
 
@@ -103,7 +112,11 @@ def add_item_form(
 
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "message": f"✅ Added {name} (Barcode: {barcode})", "image_path": image_path}
+        {
+            "request": request,
+            "message": f"✅ Added {name} (Barcode: {barcode})",
+            "image_path": image_path
+        }
     )
 
 @app.post("/search-form", response_class=HTMLResponse)
