@@ -8,6 +8,13 @@ from sqlalchemy.orm import sessionmaker, Session
 # -------------------------------------------------------------------
 # Database setup
 # -------------------------------------------------------------------
+PGUSER = os.getenv("PGUSER")
+PGPASSWORD = os.getenv("PGPASSWORD")
+PGHOST = os.getenv("PGHOST")      # use tcp_proxy_domain from Railway
+PGPORT = os.getenv("PGPORT")      # use the public port
+PGDATABASE = os.getenv("PGDATABASE")
+
+DATABASE_URL = f"postgresql+psycopg2://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
