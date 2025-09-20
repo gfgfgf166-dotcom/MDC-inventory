@@ -1,20 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Barcode Inventory</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        h1 { color: #333; }
-        form { margin-bottom: 20px; }
-        input[type=text], input[type=file] { padding: 5px; margin: 5px; }
-        input[type=submit] { padding: 5px 10px; }
-        .message { margin-top: 20px; font-weight: bold; }
-    </style>
 </head>
 <body>
     <h1>Barcode Inventory System</h1>
 
-     <!-- Add Item Form -->
+    <!-- Add Item Form -->
     <h2>Add New Item</h2>
     <form action="/add-form" method="post" enctype="multipart/form-data">
         <label>Barcode: <input type="text" name="barcode" required></label><br>
