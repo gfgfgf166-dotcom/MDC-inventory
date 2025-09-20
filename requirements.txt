@@ -5,3 +5,4 @@ psycopg2-binary   # Postgres driver for SQLAlchemy
 jinja2            # if you serve HTML templates (optional, for index.html)
 pydantic          # for request validation / schemas
 python-multipart  # only if you plan to handle file uploads later
+boto3             # something to do with cloudflare

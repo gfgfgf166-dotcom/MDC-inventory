@@ -1,41 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Barcode Inventory</title>
+    <title>Inventory App</title>
 </head>
 <body>
-    <h1>Barcode Inventory System</h1>
+    <h1>Inventory</h1>
 
-    <!-- Add Item Form -->
-    <h2>Add New Item</h2>
+    <!-- Form to add new item -->
     <form action="/add-form" method="post" enctype="multipart/form-data">
-        <label>Barcode: <input type="text" name="barcode" required></label><br>
-        <label>Name: <input type="text" name="name" required></label><br>
-        <label>Image: <input type="file" name="image" accept="image/*"></label><br>
-        <button type="submit">Add Item</button>
+        <label>Barcode:</label>
+        <input type="text" name="barcode" required><br>
+        
+        <label>Name:</label>
+        <input type="text" name="name" required><br>
+        
+        <label>Image:</label>
+        <input type="file" name="image" accept="image/*"><br>
+        
+        <input type="submit" value="Add Item">
     </form>
 
-    <hr>
-
-    <!-- Search Item Form -->
-    <h2>Search Item</h2>
-    <form action="/search-form" method="post">
-        <label>Barcode: <input type="text" name="barcode" required></label><br>
-        <button type="submit">Search</button>
-    </form>
-
-    <hr>
-
-    <!-- Messages -->
+    <!-- Message from server -->
     {% if message %}
-        <p><strong>{{ message }}</strong></p>
+        <p>{{ message }}</p>
     {% endif %}
 
     <!-- Display uploaded image -->
     {% if image_path %}
-        <h3>Item Image:</h3>
-        <img src="{{ image_path }}" alt="Item Image" width="200">
+        <h2>Uploaded Image:</h2>
+        <img src="{{ image_path }}" alt="Uploaded Image" width="200">
     {% endif %}
 </body>
 </html>

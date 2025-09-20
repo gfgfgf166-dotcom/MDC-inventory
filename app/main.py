@@ -1,5 +1,7 @@
 import os
 import uuid
+import boto3
+from botocore.client import Config
 from fastapi import FastAPI, Request, Form, Depends, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -55,12 +57,24 @@ def get_db():
 # ------------------------
 # Routes
 # ------------------------
+
+
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+# Initialize R2 client
+r2_client = boto3.client(
+    's3',
+    endpoint_url=os.getenv("R2_ENDPOINT"),
+    aws_access_key_id=os.getenv("R2_KEY"),
+    aws_secret_access_key=os.getenv("R2_SECRET"),
+    config=Config(signature_version='s3v4')
+)
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
 
 @app.post("/add-form", response_class=HTMLResponse)
 def add_item_form(
@@ -78,30 +92,33 @@ def add_item_form(
             {"request": request, "message": "❌ Barcode already exists"}
         )
 
-    image_path = None
+    image_url = None
     if image:
-        # Validate file extension
         ext = os.path.splitext(image.filename)[1].lower()
         if ext not in ALLOWED_EXTENSIONS:
             raise HTTPException(status_code=400, detail="Unsupported file type")
 
-        # Read file
         contents = image.file.read()
         if len(contents) > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail="File too large (max 5MB)")
 
         # Generate unique filename
         unique_name = f"{uuid.uuid4().hex}{ext}"
-        file_location = f"app/static/images/{unique_name}"
 
-        # Save file
-        with open(file_location, "wb") as f:
-            f.write(contents)
+        # Upload to R2
+        r2_client.put_object(
+            Bucket=os.getenv("R2_BUCKET"),
+            Key=unique_name,
+            Body=contents,
+            ContentType=image.content_type,
+            ACL="public-read"
+        )
 
-        image_path = f"/static/images/{unique_name}"
+        # Public URL
+        image_url = f"{os.getenv('R2_ENDPOINT')}/{os.getenv('R2_BUCKET')}/{unique_name}"
 
     # Add to database
-    new_item = Item(barcode=barcode, name=name, image_path=image_path)
+    new_item = Item(barcode=barcode, name=name, image_path=image_url)
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
@@ -111,9 +128,10 @@ def add_item_form(
         {
             "request": request,
             "message": f"✅ Added {name} (Barcode: {barcode})",
-            "image_path": image_path
+            "image_path": image_url
         }
     )
+
 
 @app.post("/search-form", response_class=HTMLResponse)
 def search_item_form(
