@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Barcode Inventory</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        form { margin-bottom: 20px; }
+        input[type=text] { padding: 5px; margin: 5px; }
+        input[type=submit] { padding: 5px 10px; }
+        .message { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Barcode Inventory System</h1>
+
+    <h2>Add Item</h2>
+    <form action="/add-form" method="post">
+        <input type="text" name="barcode" placeholder="Barcode" required>
+        <input type="text" name="name" placeholder="Item Name" required>
+        <input type="submit" value="Add">
+    </form>
+
+    <h2>Search Item</h2>
+    <form action="/search-form" method="post">
+        <input type="text" name="barcode" placeholder="Barcode" required>
+        <input type="submit" value="Search">
+    </form>
+
+    {% if message %}
+        <div class="message">{{ message }}</div>
+    {% endif %}
+</body>
+</html>
