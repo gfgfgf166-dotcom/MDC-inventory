@@ -14,33 +14,35 @@
 <body>
     <h1>Barcode Inventory System</h1>
 
-    <h2>Add Item</h2>
+     <!-- Add Item Form -->
+    <h2>Add New Item</h2>
     <form action="/add-form" method="post" enctype="multipart/form-data">
-        <input type="text" name="barcode" placeholder="Barcode" required>
-        <input type="text" name="name" placeholder="Item Name" required>
-        <input type="file" name="image" accept="image/*">
-        <input type="submit" value="Add">
+        <label>Barcode: <input type="text" name="barcode" required></label><br>
+        <label>Name: <input type="text" name="name" required></label><br>
+        <label>Image: <input type="file" name="image" accept="image/*"></label><br>
+        <button type="submit">Add Item</button>
     </form>
 
+    <hr>
+
+    <!-- Search Item Form -->
     <h2>Search Item</h2>
     <form action="/search-form" method="post">
-        <input type="text" name="barcode" placeholder="Barcode" required>
-        <input type="submit" value="Search">
+        <label>Barcode: <input type="text" name="barcode" required></label><br>
+        <button type="submit">Search</button>
     </form>
 
+    <hr>
+
+    <!-- Messages -->
     {% if message %}
-        <div class="message">{{ message }}</div>
+        <p><strong>{{ message }}</strong></p>
     {% endif %}
 
+    <!-- Display uploaded image -->
     {% if image_path %}
         <h3>Item Image:</h3>
         <img src="{{ image_path }}" alt="Item Image" width="200">
     {% endif %}
-	
-	{% if image_path %}
-		<h3>Item Image:</h3>
-		<img src="{{ image_path }}" alt="Item Image" width="200">
-	{% endif %}
-
 </body>
 </html>

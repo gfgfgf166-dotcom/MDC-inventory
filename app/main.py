@@ -60,11 +60,27 @@ def get_db():
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+# Ensure static/images folder exists
+os.makedirs("app/static/images", exist_ok=True)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# --- Allowed image extensions ---
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
+# --- Max file size (optional, 5MB) ---
+MAX_FILE_SIZE = 5 * 1024 * 1024
+
+# --- Database dependency ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# --- Add item route ---
 @app.post("/add-form", response_class=HTMLResponse)
-async def add_item_form(
+def add_item_form(
     request: Request,
     barcode: str = Form(...),
     name: str = Form(...),
@@ -81,13 +97,13 @@ async def add_item_form(
 
     image_path = None
     if image:
-        # Validate file extension
+        # Validate extension
         ext = os.path.splitext(image.filename)[1].lower()
         if ext not in ALLOWED_EXTENSIONS:
             raise HTTPException(status_code=400, detail="Unsupported file type")
 
-        # Read contents and check size
-        contents = await image.read()
+        # Read file and check size
+        contents = image.file.read()
         if len(contents) > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail="File too large (max 5MB)")
 
@@ -95,7 +111,7 @@ async def add_item_form(
         unique_name = f"{uuid.uuid4().hex}{ext}"
         file_location = f"app/static/images/{unique_name}"
 
-        # Ensure folder exists
+        # Ensure folder exists (redundant but safe)
         os.makedirs(os.path.dirname(file_location), exist_ok=True)
 
         # Save file
