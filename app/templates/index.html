@@ -10,19 +10,19 @@
     <form action="/add-form" method="post" enctype="multipart/form-data">
         <label>Barcode:</label>
         <input type="text" name="barcode"><br>
-        
+
         <label>Name:</label>
         <input type="text" name="name"><br>
-        
+
         <label>Image:</label>
         <input type="file" name="image" accept="image/*"><br>
-        
+
         <input type="submit" value="Add Item">
     </form>
 
     <!-- Message from server -->
     {% if message %}
-        <p>{{ message }}</p>
+        <p><strong>{{ message }}</strong></p>
     {% endif %}
 
     <h2>Existing Items</h2>
