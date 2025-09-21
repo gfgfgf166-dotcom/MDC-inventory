@@ -10,18 +10,18 @@
         <p><strong>{{ message }}</strong></p>
     {% endif %}
 
-    <form action="/add-form" method="post">
-        <label for="id">ID (optional):</label><br>
+    <form action="/add-form" method="post" enctype="multipart/form-data">
+        <label>ID (optional):</label><br>
         <input type="number" name="id"><br><br>
 
-        <label for="barcode">Barcode (optional):</label><br>
+        <label>Barcode (optional):</label><br>
         <input type="text" name="barcode"><br><br>
 
-        <label for="name">Name (optional):</label><br>
+        <label>Name (optional):</label><br>
         <input type="text" name="name"><br><br>
 
-        <label for="image_url">Image URL (optional):</label><br>
-        <input type="text" name="image_url"><br><br>
+        <label>Image (optional):</label><br>
+        <input type="file" name="image"><br><br>
 
         <button type="submit">Add Item</button>
     </form>

@@ -12,14 +12,20 @@
                 <th>ID</th>
                 <th>Barcode</th>
                 <th>Name</th>
-                <th>Image URL</th>
+                <th>Image</th>
             </tr>
             {% for item in items %}
             <tr>
                 <td>{{ item.id }}</td>
                 <td>{{ item.barcode }}</td>
                 <td>{{ item.name }}</td>
-                <td>{{ item.image_url }}</td>
+                <td>
+                    {% if item.image_url %}
+                        <img src="{{ item.image_url }}" width="150">
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </table>

@@ -1,9 +1,12 @@
 import os
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Request, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table, select
 from sqlalchemy.orm import sessionmaker
+import uuid
+import shutil
 
 # -----------------------------
 # Database Setup
@@ -16,7 +19,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 metadata = MetaData()
 
-# Define table with all optional fields
 items_table = Table(
     "items",
     metadata,
@@ -26,21 +28,24 @@ items_table = Table(
     Column("image_url", String, nullable=True),
 )
 
-# Create table if not exists
 metadata.create_all(engine)
 
 # -----------------------------
 # FastAPI Setup
 # -----------------------------
 app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory="templates")
+
+# Serve uploaded images
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # -----------------------------
 # Routes
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 async def read_form(request: Request):
-    """Serve the HTML form"""
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/add-form")
@@ -49,10 +54,25 @@ async def add_item(
     id: int | None = Form(None),
     barcode: str | None = Form(None),
     name: str | None = Form(None),
-    image_url: str | None = Form(None),
+    image: UploadFile | None = File(None),
 ):
-    """Insert an item into the DB with all fields optional"""
     db = SessionLocal()
+    image_url = None
+
+    # Handle uploaded image
+    if image:
+        # Generate unique filename
+        ext = image.filename.split(".")[-1]
+        filename = f"{uuid.uuid4()}.{ext}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        # Save file locally
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+
+        # Store URL relative to /static
+        image_url = f"/static/uploads/{filename}"
+
     try:
         insert_stmt = items_table.insert().values(
             id=id,
@@ -73,7 +93,6 @@ async def add_item(
 
 @app.get("/list-items", response_class=HTMLResponse)
 async def list_items(request: Request):
-    """Display all items in the DB"""
     db = SessionLocal()
     try:
         stmt = select(items_table)
