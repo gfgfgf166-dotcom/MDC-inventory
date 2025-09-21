@@ -14,16 +14,11 @@ logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 
-# -------------------
 # Templates
-# -------------------
-# Use absolute path relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-# -------------------
 # Database setup
-# -------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -38,9 +33,7 @@ class Item(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# -------------------
 # R2 setup
-# -------------------
 r2_endpoint = os.getenv("R2_ENDPOINT")
 r2_bucket = os.getenv("R2_BUCKET")
 r2_token = os.getenv("R2_TOKEN")
@@ -53,9 +46,7 @@ r2_client = boto3.client(
     config=Config(signature_version='s3v4')
 )
 
-# -------------------
 # Routes
-# -------------------
 @app.get("/", response_class=HTMLResponse)
 def read_index(request: Request):
     db = SessionLocal()
@@ -120,9 +111,7 @@ async def add_item_form(
         {"request": request, "items": items, "message": "Item added successfully!"}
     )
 
-# -------------------
-# Uvicorn entry point for Railway
-# -------------------
+# Railway dynamic port
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # Railway provides PORT env var
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
