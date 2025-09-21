@@ -33,7 +33,7 @@ metadata.create_all(engine)
 # FastAPI Setup
 # -----------------------------
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="app/templates")
 
 # -----------------------------
 # Routes
