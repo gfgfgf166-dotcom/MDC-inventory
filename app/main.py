@@ -51,7 +51,7 @@ s3_client = boto3.client(
 # FastAPI setup
 # -----------------------------
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="app/templates")
 
 # -----------------------------
 # Routes
