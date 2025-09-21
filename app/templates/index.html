@@ -6,7 +6,6 @@
 <body>
     <h1>Inventory</h1>
 
-    <!-- Form to add new item -->
     <form action="/add-form" method="post" enctype="multipart/form-data">
         <label>Barcode:</label>
         <input type="text" name="barcode"><br>
@@ -20,7 +19,6 @@
         <input type="submit" value="Add Item">
     </form>
 
-    <!-- Message from server -->
     {% if message %}
         <p><strong>{{ message }}</strong></p>
     {% endif %}

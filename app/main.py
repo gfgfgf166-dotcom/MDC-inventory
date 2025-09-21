@@ -8,11 +8,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import boto3
 from botocore.client import Config
+import uvicorn
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")  # adjust path if needed
+
+# -------------------
+# Templates
+# -------------------
+# Use absolute path relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # -------------------
 # Database setup
@@ -29,7 +36,6 @@ class Item(Base):
     name = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
 
-# Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
 # -------------------
@@ -50,7 +56,6 @@ r2_client = boto3.client(
 # -------------------
 # Routes
 # -------------------
-
 @app.get("/", response_class=HTMLResponse)
 def read_index(request: Request):
     db = SessionLocal()
@@ -68,7 +73,6 @@ async def add_item_form(
     db = SessionLocal()
     image_url = None
 
-    # Upload image if provided
     if image:
         contents = await image.read()
         try:
@@ -82,14 +86,13 @@ async def add_item_form(
             logging.info(f"Uploaded {image.filename} to R2 successfully.")
         except Exception as e:
             logging.error(f"R2 upload failed: {e}")
-            db.close()
             items = db.query(Item).all()
+            db.close()
             return templates.TemplateResponse(
                 "index.html",
                 {"request": request, "items": items, "message": f"Image upload failed: {e}"}
             )
 
-    # Insert into DB
     try:
         new_item = Item(
             barcode=barcode if barcode else "N/A",
@@ -103,8 +106,8 @@ async def add_item_form(
     except Exception as e:
         logging.error(f"Database insert failed: {e}")
         db.rollback()
-        db.close()
         items = db.query(Item).all()
+        db.close()
         return templates.TemplateResponse(
             "index.html",
             {"request": request, "items": items, "message": f"Database error: {e}"}
@@ -116,3 +119,10 @@ async def add_item_form(
         "index.html",
         {"request": request, "items": items, "message": "Item added successfully!"}
     )
+
+# -------------------
+# Uvicorn entry point for Railway
+# -------------------
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Railway provides PORT env var
+    uvicorn.run(app, host="0.0.0.0", port=port)
