@@ -1,19 +1,18 @@
 import os
-from fastapi import FastAPI, Form, Request, UploadFile, File
+import uuid
+import boto3
+from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table, select
 from sqlalchemy.orm import sessionmaker
-import uuid
-import shutil
 
 # -----------------------------
-# Database Setup
+# Database setup
 # -----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable not set!")
+    raise RuntimeError("DATABASE_URL not set")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -31,21 +30,34 @@ items_table = Table(
 metadata.create_all(engine)
 
 # -----------------------------
-# FastAPI Setup
+# R2 setup
+# -----------------------------
+R2_ENDPOINT = os.getenv("R2_ENDPOINT_URL")
+R2_BUCKET = os.getenv("R2_BUCKET_NAME")
+R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY")
+R2_SECRET_KEY = os.getenv("R2_SECRET_KEY")
+
+if not all([R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY, R2_SECRET_KEY]):
+    raise RuntimeError("R2 environment variables not set")
+
+s3_client = boto3.client(
+    "s3",
+    endpoint_url=R2_ENDPOINT,
+    aws_access_key_id=R2_ACCESS_KEY,
+    aws_secret_access_key=R2_SECRET_KEY,
+)
+
+# -----------------------------
+# FastAPI setup
 # -----------------------------
 app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")
-
-# Serve uploaded images
-UPLOAD_DIR = "static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 # -----------------------------
 # Routes
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
-async def read_form(request: Request):
+async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/add-form")
@@ -59,28 +71,27 @@ async def add_item(
     db = SessionLocal()
     image_url = None
 
-    # Handle uploaded image
+    # Upload image to R2
     if image:
-        # Generate unique filename
         ext = image.filename.split(".")[-1]
         filename = f"{uuid.uuid4()}.{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-
-        # Save file locally
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-
-        # Store URL relative to /static
-        image_url = f"/static/uploads/{filename}"
+        s3_client.upload_fileobj(
+            image.file,
+            R2_BUCKET,
+            filename,
+            ExtraArgs={"ACL": "public-read", "ContentType": image.content_type},
+        )
+        image_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{filename}"
 
     try:
-        insert_stmt = items_table.insert().values(
-            id=id,
-            barcode=barcode,
-            name=name,
-            image_url=image_url,
+        db.execute(
+            items_table.insert().values(
+                id=id,
+                barcode=barcode,
+                name=name,
+                image_url=image_url,
+            )
         )
-        db.execute(insert_stmt)
         db.commit()
         message = "✅ Item added successfully!"
     except Exception as e:
@@ -90,14 +101,3 @@ async def add_item(
         db.close()
 
     return templates.TemplateResponse("index.html", {"request": request, "message": message})
-
-@app.get("/list-items", response_class=HTMLResponse)
-async def list_items(request: Request):
-    db = SessionLocal()
-    try:
-        stmt = select(items_table)
-        results = db.execute(stmt).fetchall()
-    finally:
-        db.close()
-
-    return templates.TemplateResponse("list.html", {"request": request, "items": results})
