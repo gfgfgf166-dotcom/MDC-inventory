@@ -2,36 +2,30 @@
 <html>
 <head>
     <title>Add Item</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 2em; }
-        form { margin-bottom: 2em; }
-        .item { border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; border-radius: 5px; }
-        .item img { max-width: 200px; display: block; margin-top: 0.5em; }
-    </style>
 </head>
 <body>
     <h1>Add Item</h1>
-    <form action="/add-form" method="post" enctype="multipart/form-data">
-        <label>Name:</label><br>
+
+    {% if message %}
+        <p><strong>{{ message }}</strong></p>
+    {% endif %}
+
+    <form action="/add-form" method="post">
+        <label for="id">ID (optional):</label><br>
+        <input type="number" name="id"><br><br>
+
+        <label for="barcode">Barcode (optional):</label><br>
+        <input type="text" name="barcode"><br><br>
+
+        <label for="name">Name (optional):</label><br>
         <input type="text" name="name"><br><br>
-        <label>Description:</label><br>
-        <textarea name="description"></textarea><br><br>
-        <label>Image:</label><br>
-        <input type="file" name="image"><br><br>
+
+        <label for="image_url">Image URL (optional):</label><br>
+        <input type="text" name="image_url"><br><br>
+
         <button type="submit">Add Item</button>
     </form>
 
-    <h2>Stored Items</h2>
-    {% for item in items %}
-        <div class="item">
-            <h3>{{ item.name or "Unnamed" }}</h3>
-            <p>{{ item.description or "No description" }}</p>
-            {% if item.image_url %}
-                <img src="{{ item.image_url }}" alt="Image for {{ item.name }}">
-            {% endif %}
-        </div>
-    {% else %}
-        <p>No items yet.</p>
-    {% endfor %}
+    <p><a href="/list-items">📋 View all items</a></p>
 </body>
 </html>

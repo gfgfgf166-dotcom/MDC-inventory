@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Items</title>
+</head>
+<body>
+    <h1>All Items</h1>
+
+    {% if items %}
+        <table border="1" cellpadding="5">
+            <tr>
+                <th>ID</th>
+                <th>Barcode</th>
+                <th>Name</th>
+                <th>Image URL</th>
+            </tr>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.barcode }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.image_url }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No items found in the database.</p>
+    {% endif %}
+
+    <p><a href="/">➕ Add another item</a></p>
+</body>
+</html>

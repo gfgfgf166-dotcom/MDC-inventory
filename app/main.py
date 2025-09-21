@@ -1,85 +1,84 @@
-# app/main.py
 import os
-from fastapi import FastAPI, Form, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table, select
 from sqlalchemy.orm import sessionmaker
-import boto3
-from botocore.exceptions import NoCredentialsError
 
 # -----------------------------
-# Database setup
+# Database Setup
 # -----------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set!")
+    raise RuntimeError("DATABASE_URL environment variable not set!")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+metadata = MetaData()
 
-class Item(Base):
-    __tablename__ = "items"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=True)
-    description = Column(String, nullable=True)
-    image_url = Column(String, nullable=True)
-
-Base.metadata.create_all(bind=engine)
-
-# -----------------------------
-# Cloudflare R2 setup
-# -----------------------------
-R2_ENDPOINT = os.environ.get("R2_ENDPOINT")
-R2_BUCKET = os.environ.get("R2_BUCKET")
-R2_TOKEN = os.environ.get("R2_TOKEN")
-
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=R2_ENDPOINT,
-    aws_access_key_id=R2_TOKEN,
-    aws_secret_access_key=R2_TOKEN,
+# Define table with all optional fields
+items_table = Table(
+    "items",
+    metadata,
+    Column("id", Integer, primary_key=True, nullable=True),
+    Column("barcode", String, nullable=True),
+    Column("name", String, nullable=True),
+    Column("image_url", String, nullable=True),
 )
 
+# Create table if not exists
+metadata.create_all(engine)
+
 # -----------------------------
-# FastAPI app setup
+# FastAPI Setup
 # -----------------------------
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory="templates")
 
 # -----------------------------
 # Routes
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    session = SessionLocal()
-    items = session.query(Item).all()
-    session.close()
-    return templates.TemplateResponse("index.html", {"request": request, "items": items})
+async def read_form(request: Request):
+    """Serve the HTML form"""
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/add-form")
-async def add_form(
-    name: str = Form(None),
-    description: str = Form(None),
-    image: UploadFile = File(None),
+async def add_item(
+    request: Request,
+    id: int | None = Form(None),
+    barcode: str | None = Form(None),
+    name: str | None = Form(None),
+    image_url: str | None = Form(None),
 ):
-    session = SessionLocal()
-    image_url = None
+    """Insert an item into the DB with all fields optional"""
+    db = SessionLocal()
+    try:
+        insert_stmt = items_table.insert().values(
+            id=id,
+            barcode=barcode,
+            name=name,
+            image_url=image_url,
+        )
+        db.execute(insert_stmt)
+        db.commit()
+        message = "✅ Item added successfully!"
+    except Exception as e:
+        db.rollback()
+        message = f"❌ Error: {str(e)}"
+    finally:
+        db.close()
 
-    if image:
-        try:
-            s3_client.upload_fileobj(image.file, R2_BUCKET, image.filename)
-            image_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{image.filename}"
-        except NoCredentialsError:
-            return {"error": "Invalid R2 credentials"}
+    return templates.TemplateResponse("index.html", {"request": request, "message": message})
 
-    new_item = Item(name=name, description=description, image_url=image_url)
-    session.add(new_item)
-    session.commit()
-    session.close()
+@app.get("/list-items", response_class=HTMLResponse)
+async def list_items(request: Request):
+    """Display all items in the DB"""
+    db = SessionLocal()
+    try:
+        stmt = select(items_table)
+        results = db.execute(stmt).fetchall()
+    finally:
+        db.close()
 
-    return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse("list.html", {"request": request, "items": results})
