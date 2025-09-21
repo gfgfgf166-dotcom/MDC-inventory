@@ -1,11 +1,12 @@
 import os
 import uuid
 import boto3
-from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table, select
+from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
 from sqlalchemy.orm import sessionmaker
+import mimetypes
 
 # -----------------------------
 # Database setup
@@ -54,6 +55,17 @@ app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
 
 # -----------------------------
+# Helper for background upload
+# -----------------------------
+def upload_to_r2(file, filename, content_type):
+    s3_client.upload_fileobj(
+        file,
+        R2_BUCKET,
+        filename,
+        ExtraArgs={"ACL": "public-read", "ContentType": content_type},
+    )
+
+# -----------------------------
 # Routes
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
@@ -63,6 +75,7 @@ async def index(request: Request):
 @app.post("/add-form")
 async def add_item(
     request: Request,
+    background_tasks: BackgroundTasks,
     id: int | None = Form(None),
     barcode: str | None = Form(None),
     name: str | None = Form(None),
@@ -71,16 +84,12 @@ async def add_item(
     db = SessionLocal()
     image_url = None
 
-    # Upload image to R2
+    # If an image is uploaded, schedule background upload
     if image:
         ext = image.filename.split(".")[-1]
         filename = f"{uuid.uuid4()}.{ext}"
-        s3_client.upload_fileobj(
-            image.file,
-            R2_BUCKET,
-            filename,
-            ExtraArgs={"ACL": "public-read", "ContentType": image.content_type},
-        )
+        content_type = mimetypes.guess_type(image.filename)[0] or "application/octet-stream"
+        background_tasks.add_task(upload_to_r2, image.file, filename, content_type)
         image_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{filename}"
 
     try:
@@ -100,4 +109,5 @@ async def add_item(
     finally:
         db.close()
 
+    # Return immediately, image upload continues in background
     return templates.TemplateResponse("index.html", {"request": request, "message": message})
