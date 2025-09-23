@@ -1,113 +1,94 @@
 import os
 import uuid
+import io
+import mimetypes
 import boto3
 from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
-from sqlalchemy.orm import sessionmaker
-import mimetypes
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import Column, Integer, String, create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
 
-# -----------------------------
-# Database setup
-# -----------------------------
+# Load env vars
+load_dotenv()
+
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL not set")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_BUCKET = os.getenv("R2_BUCKET")
+R2_ENDPOINT = os.getenv("R2_ENDPOINT")
 
+# Database setup
 engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-metadata = MetaData()
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+Base = declarative_base()
 
-items_table = Table(
-    "items",
-    metadata,
-    Column("id", Integer, primary_key=True, nullable=True),
-    Column("barcode", String, nullable=True),
-    Column("name", String, nullable=True),
-    Column("image_url", String, nullable=True),
-)
+class Item(Base):
+    __tablename__ = "items"
+    id = Column(Integer, primary_key=True, index=True)
+    barcode = Column(String, nullable=True)
+    name = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
 
-metadata.create_all(engine)
+Base.metadata.create_all(bind=engine)
 
-# -----------------------------
-# R2 setup
-# -----------------------------
-R2_ENDPOINT = os.getenv("R2_ENDPOINT_URL")
-R2_BUCKET = os.getenv("R2_BUCKET_NAME")
-R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY")
-R2_SECRET_KEY = os.getenv("R2_SECRET_KEY")
+# FastAPI setup
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-if not all([R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY, R2_SECRET_KEY]):
-    raise RuntimeError("R2 environment variables not set")
-
+# R2 client
 s3_client = boto3.client(
     "s3",
     endpoint_url=R2_ENDPOINT,
-    aws_access_key_id=R2_ACCESS_KEY,
-    aws_secret_access_key=R2_SECRET_KEY,
+    aws_access_key_id=R2_ACCESS_KEY_ID,
+    aws_secret_access_key=R2_SECRET_ACCESS_KEY,
 )
 
-# -----------------------------
-# FastAPI setup
-# -----------------------------
-app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")
-
-# -----------------------------
-# Helper for background upload
-# -----------------------------
-def upload_to_r2(file, filename, content_type):
-    s3_client.upload_fileobj(
-        file,
-        R2_BUCKET,
-        filename,
-        ExtraArgs={"ACL": "public-read", "ContentType": content_type},
-    )
-
-# -----------------------------
-# Routes
-# -----------------------------
+# Home page
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+# Add-form route
 @app.post("/add-form")
 async def add_item(
     request: Request,
     background_tasks: BackgroundTasks,
-    id: int | None = Form(None),
-    barcode: str | None = Form(None),
-    name: str | None = Form(None),
-    image: UploadFile | None = File(None),
+    id: int = Form(None),
+    barcode: str = Form(None),
+    name: str = Form(None),
+    image: UploadFile = File(None)
 ):
     db = SessionLocal()
     image_url = None
 
-    # If an image is uploaded, schedule background upload
     if image:
         ext = image.filename.split(".")[-1]
         filename = f"{uuid.uuid4()}.{ext}"
         content_type = mimetypes.guess_type(image.filename)[0] or "application/octet-stream"
-        background_tasks.add_task(upload_to_r2, image.file, filename, content_type)
-        image_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{filename}"
 
-    try:
-        db.execute(
-            items_table.insert().values(
-                id=id,
-                barcode=barcode,
-                name=name,
-                image_url=image_url,
+        # Read file into memory immediately
+        file_bytes = await image.read()
+
+        # Upload asynchronously
+        background_tasks.add_task(
+            lambda b=file_bytes: s3_client.upload_fileobj(
+                io.BytesIO(b),
+                R2_BUCKET,
+                filename,
+                ExtraArgs={"ACL": "public-read", "ContentType": content_type}
             )
         )
-        db.commit()
-        message = "✅ Item added successfully!"
-    except Exception as e:
-        db.rollback()
-        message = f"❌ Error: {str(e)}"
-    finally:
-        db.close()
 
-    # Return immediately, image upload continues in background
-    return templates.TemplateResponse("index.html", {"request": request, "message": message})
+        image_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{filename}"
+
+    new_item = Item(id=id, barcode=barcode, name=name, image_url=image_url)
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+    db.close()
+
+    return templates.TemplateResponse("index.html", {"request": request, "message": "Item added!"})
