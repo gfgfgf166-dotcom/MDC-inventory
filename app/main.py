@@ -36,7 +36,7 @@ Base.metadata.create_all(bind=engine)
 
 # FastAPI setup
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # R2 client
