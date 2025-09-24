@@ -70,11 +70,11 @@ def display_items(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("display.html", {"request": request, "items": items})
 
 # Add new item
-@app.get("/add-form", response_class=HTMLResponse)
+@app.get("/add", response_class=HTMLResponse)
 def add_form(request: Request, db: Session = Depends(get_db)):
     max_id = db.query(Item.id).order_by(Item.id.desc()).first()
     next_id = (max_id[0] + 1) if max_id else 1
-    categories = ["Electronics", "Furniture", "Clothing", "Other"]  # example options
+    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]  # example options
     return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
 
 @app.post("/add-form", response_class=HTMLResponse)
@@ -119,7 +119,7 @@ def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_d
     item = db.query(Item).filter(Item.id == id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    categories = ["Electronics", "Furniture", "Clothing", "Other"]
+    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
     return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "categories": categories, "step": "edit"})
 
 # Update item
