@@ -1,50 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Add Item</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Add New Item</title>
 </head>
 <body>
     <h1>Add New Item</h1>
-    <a href="/">⬅ Back to Home</a>
-
     <form action="/add" method="post">
-        <label>ID (Auto-generated):</label>
-        <input type="text" value="{{ next_id }}" disabled><br>
+        <label for="id">ID:</label>
+        <input type="number" id="id" name="id" value="{{ next_id }}" readonly><br><br>
 
         <label for="category">Category:</label>
-        <select name="category" id="category" required>
-            {% for cat in categories %}
-                <option value="{{ cat }}">{{ cat }}</option>
+        <select id="category" name="category" required>
+            {% for c in categories %}
+            <option value="{{ c }}">{{ c }}</option>
             {% endfor %}
-        </select><br>
+        </select><br><br>
 
         <label for="name">Name:</label>
-        <input type="text" name="name" id="name" required><br>
+        <input type="text" id="name" name="name"><br><br>
 
         <label for="color">Color:</label>
-        <input type="text" name="color" id="color"><br>
+        <input type="text" id="color" name="color"><br><br>
 
         <label for="height">Height:</label>
-        <input type="number" step="0.01" name="height" id="height"><br>
+        <input type="number" step="0.01" id="height" name="height"><br><br>
 
         <label for="width">Width:</label>
-        <input type="number" step="0.01" name="width" id="width"><br>
+        <input type="number" step="0.01" id="width" name="width"><br><br>
 
         <label for="depth">Depth:</label>
-        <input type="number" step="0.01" name="depth" id="depth"><br>
+        <input type="number" step="0.01" id="depth" name="depth"><br><br>
 
         <label for="material">Material:</label>
-        <input type="text" name="material" id="material"><br>
+        <input type="text" id="material" name="material"><br><br>
 
         <label for="cost">Cost:</label>
-        <input type="number" step="0.01" name="cost" id="cost"><br>
+        <input type="number" step="0.01" id="cost" name="cost"><br><br>
 
         <label for="price">Price:</label>
-        <input type="number" step="0.01" name="price" id="price"><br>
+        <input type="number" step="0.01" id="price" name="price"><br><br>
 
         <button type="submit">Add Item</button>
     </form>
+
+    <br>
+    <a href="/display">Back to Inventory</a>
 </body>
 </html>
