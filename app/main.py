@@ -1,88 +1,37 @@
-import os
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, Float
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
 
-# -------------------
-# Database Setup
-# -------------------
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable not set")
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# -------------------
-# Models
-# -------------------
-class Item(Base):
-    __tablename__ = "items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    category = Column(String, nullable=False)
-    name = Column(String, nullable=True)
-    color = Column(String, nullable=True)
-    height = Column(Float, nullable=True)
-    width = Column(Float, nullable=True)
-    depth = Column(Float, nullable=True)
-    material = Column(String, nullable=True)
-    cost = Column(Float, nullable=True)
-    price = Column(Float, nullable=True)
-
-# Create table if not exists
-Base.metadata.create_all(bind=engine)
-
-# -------------------
-# FastAPI App
-# -------------------
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
+# Mount templates
+templates = Jinja2Templates(directory="templates")
 
-# Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# In-memory data table
+data = []
 
-# -------------------
-# Routes
-# -------------------
-
+# -------------------- Home --------------------
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "data": data})
 
-# Display all items
+# -------------------- Display --------------------
 @app.get("/display", response_class=HTMLResponse)
-def display_items(request: Request, db: Session = Depends(get_db)):
-    items = db.query(Item).all()
-    return templates.TemplateResponse("display.html", {"request": request, "items": items})
+async def display_items(request: Request):
+    return templates.TemplateResponse("display.html", {"request": request, "data": data})
 
-# Add new item
+# -------------------- Add Form (GET) --------------------
 @app.get("/add", response_class=HTMLResponse)
-def add_form(request: Request, db: Session = Depends(get_db)):
-    max_id = db.query(Item.id).order_by(Item.id.desc()).first()
-    next_id = (max_id[0] + 1) if max_id else 1
-    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]  # example options
-    return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
+async def add_form(request: Request):
+    return templates.TemplateResponse("add.html", {"request": request})
 
-@app.post("/add-form", response_class=HTMLResponse)
-def add_item(
+# -------------------- Add Item (POST) --------------------
+@app.post("/add")
+async def add_item(
     request: Request,
-    id: int = Form(...),
     category: str = Form(...),
-    name: str = Form(None),
+    name: str = Form(...),
     color: str = Form(None),
     height: float = Form(None),
     width: float = Form(None),
@@ -90,45 +39,44 @@ def add_item(
     material: str = Form(None),
     cost: float = Form(None),
     price: float = Form(None),
-    db: Session = Depends(get_db),
 ):
-    new_item = Item(
-        id=id,
-        category=category,
-        name=name,
-        color=color,
-        height=height,
-        width=width,
-        depth=depth,
-        material=material,
-        cost=cost,
-        price=price,
-    )
-    db.add(new_item)
-    db.commit()
+    # Auto-generate ID
+    new_id = max([item["ID"] for item in data], default=0) + 1
+    new_item = {
+        "ID": new_id,
+        "Category": category,
+        "Name": name,
+        "Color": color,
+        "Height": height,
+        "Width": width,
+        "Depth": depth,
+        "Material": material,
+        "Cost": cost,
+        "Price": price
+    }
+    data.append(new_item)
     return RedirectResponse(url="/display", status_code=303)
 
-# Remove/Edit page – step 1: enter ID
-@app.get("/remove-edit", response_class=HTMLResponse)
-def remove_edit_form(request: Request):
-    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "step": "input"})
+# -------------------- Remove/Edit Form (GET) --------------------
+@app.get("/remove_edit", response_class=HTMLResponse)
+async def remove_edit_form(request: Request):
+    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "not_found": False})
 
-# Remove/Edit page – step 2: show item by ID
-@app.post("/remove-edit/find", response_class=HTMLResponse)
-def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == id).first()
+# -------------------- Remove/Edit Lookup (POST) --------------------
+@app.post("/remove_edit")
+async def remove_edit_lookup(request: Request, item_id: int = Form(...)):
+    item = next((i for i in data if i["ID"] == item_id), None)
     if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
-    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "categories": categories, "step": "edit"})
+        return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "not_found": True})
+    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "not_found": False})
 
-# Update item
-@app.post("/remove-edit/update", response_class=HTMLResponse)
-def update_item(
+# -------------------- Update Item (POST) --------------------
+@app.post("/update_item")
+async def update_item(
     request: Request,
-    id: int = Form(...),
+    item_id: int = Form(...),
     category: str = Form(...),
-    name: str = Form(None),
+    name: str = Form(...),
     color: str = Form(None),
     height: float = Form(None),
     width: float = Form(None),
@@ -136,31 +84,27 @@ def update_item(
     material: str = Form(None),
     cost: float = Form(None),
     price: float = Form(None),
-    db: Session = Depends(get_db),
 ):
-    item = db.query(Item).filter(Item.id == id).first()
+    item = next((i for i in data if i["ID"] == item_id), None)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    item.category = category
-    item.name = name
-    item.color = color
-    item.height = height
-    item.width = width
-    item.depth = depth
-    item.material = material
-    item.cost = cost
-    item.price = price
-
-    db.commit()
+    item.update({
+        "Category": category,
+        "Name": name,
+        "Color": color,
+        "Height": height,
+        "Width": width,
+        "Depth": depth,
+        "Material": material,
+        "Cost": cost,
+        "Price": price
+    })
     return RedirectResponse(url="/display", status_code=303)
 
-# Delete item
-@app.post("/remove-edit/delete", response_class=HTMLResponse)
-def delete_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    db.delete(item)
-    db.commit()
+# -------------------- Delete Item (POST) --------------------
+@app.post("/delete_item")
+async def delete_item(item_id: int = Form(...)):
+    global data
+    data = [i for i in data if i["ID"] != item_id]
     return RedirectResponse(url="/display", status_code=303)
