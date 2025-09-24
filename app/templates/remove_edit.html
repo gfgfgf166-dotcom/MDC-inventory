@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Remove or Edit Item</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Remove / Edit Item</h1>
+    <a href="/">⬅ Back to Home</a>
+
+    {% if step == "input" %}
+        <h2>Enter Item ID</h2>
+        <form action="/remove-edit/find" method="post">
+            <label for="id">Item ID:</label>
+            <input type="number" name="id" id="id" required>
+            <button type="submit">Find</button>
+        </form>
+    {% elif step == "edit" and item %}
+        <h2>Edit or Remove Item</h2>
+        <form action="/remove-edit/update" method="post">
+            <input type="hidden" name="id" value="{{ item.id }}">
+
+            <label>ID:</label>
+            <input type="text" value="{{ item.id }}" disabled><br>
+
+            <label for="category">Category:</label>
+            <select name="category" id="category" required>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if item.category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select><br>
+
+            <label for="name">Name:</label>
+            <input type="text" name="name" id="name" value="{{ item.name }}"><br>
+
+            <label for="color">Color:</label>
+            <input type="text" name="color" id="color" value="{{ item.color }}"><br>
+
+            <label for="height">Height:</label>
+            <input type="number" step="0.01" name="height" id="height" value="{{ item.height }}"><br>
+
+            <label for="width">Width:</label>
+            <input type="number" step="0.01" name="width" id="width" value="{{ item.width }}"><br>
+
+            <label for="depth">Depth:</label>
+            <input type="number" step="0.01" name="depth" id="depth" value="{{ item.depth }}"><br>
+
+            <label for="material">Material:</label>
+            <input type="text" name="material" id="material" value="{{ item.material }}"><br>
+
+            <label for="cost">Cost:</label>
+            <input type="number" step="0.01" name="cost" id="cost" value="{{ item.cost }}"><br>
+
+            <label for="price">Price:</label>
+            <input type="number" step="0.01" name="price" id="price" value="{{ item.price }}"><br>
+
+            <button type="submit">Update Item</button>
+        </form>
+
+        <hr>
+
+        <h2>Delete This Item</h2>
+        <form action="/remove-edit/delete" method="post">
+            <input type="hidden" name="id" value="{{ item.id }}">
+            <button type="submit" style="color:red;">Delete Item</button>
+        </form>
+    {% endif %}
+</body>
+</html>

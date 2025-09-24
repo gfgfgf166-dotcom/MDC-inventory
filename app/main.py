@@ -1,94 +1,166 @@
 import os
-import uuid
-import io
-import mimetypes
-import boto3
-from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
-# Load env vars
-load_dotenv()
-
+# -------------------
+# Database Setup
+# -------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
-R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
-R2_BUCKET = os.getenv("R2_BUCKET")
-R2_ENDPOINT = os.getenv("R2_ENDPOINT")
 
-# Database setup
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable not set")
+
 engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# -------------------
+# Models
+# -------------------
 class Item(Base):
     __tablename__ = "items"
-    id = Column(Integer, primary_key=True, index=True)
-    barcode = Column(String, nullable=True)
-    name = Column(String, nullable=True)
-    image_url = Column(String, nullable=True)
 
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, nullable=False)
+    name = Column(String, nullable=True)
+    color = Column(String, nullable=True)
+    height = Column(Float, nullable=True)
+    width = Column(Float, nullable=True)
+    depth = Column(Float, nullable=True)
+    material = Column(String, nullable=True)
+    cost = Column(Float, nullable=True)
+    price = Column(Float, nullable=True)
+
+# Create table if not exists
 Base.metadata.create_all(bind=engine)
 
-# FastAPI setup
+# -------------------
+# FastAPI App
+# -------------------
 app = FastAPI()
-templates = Jinja2Templates(directory="app/templates")
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
-# R2 client
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=R2_ENDPOINT,
-    aws_access_key_id=R2_ACCESS_KEY_ID,
-    aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-)
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-# Home page
+# -------------------
+# Routes
+# -------------------
+
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
+def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Add-form route
-@app.post("/add-form")
-async def add_item(
+# Display all items
+@app.get("/display", response_class=HTMLResponse)
+def display_items(request: Request, db: Session = Depends(get_db)):
+    items = db.query(Item).all()
+    return templates.TemplateResponse("display.html", {"request": request, "items": items})
+
+# Add new item
+@app.get("/add-form", response_class=HTMLResponse)
+def add_form(request: Request, db: Session = Depends(get_db)):
+    max_id = db.query(Item.id).order_by(Item.id.desc()).first()
+    next_id = (max_id[0] + 1) if max_id else 1
+    categories = ["Electronics", "Furniture", "Clothing", "Other"]  # example options
+    return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
+
+@app.post("/add-form", response_class=HTMLResponse)
+def add_item(
     request: Request,
-    background_tasks: BackgroundTasks,
-    id: int = Form(None),
-    barcode: str = Form(None),
+    id: int = Form(...),
+    category: str = Form(...),
     name: str = Form(None),
-    image: UploadFile = File(None)
+    color: str = Form(None),
+    height: float = Form(None),
+    width: float = Form(None),
+    depth: float = Form(None),
+    material: str = Form(None),
+    cost: float = Form(None),
+    price: float = Form(None),
+    db: Session = Depends(get_db),
 ):
-    db = SessionLocal()
-    image_url = None
-
-    if image:
-        ext = image.filename.split(".")[-1]
-        filename = f"{uuid.uuid4()}.{ext}"
-        content_type = mimetypes.guess_type(image.filename)[0] or "application/octet-stream"
-
-        # Read file into memory immediately
-        file_bytes = await image.read()
-
-        # Upload asynchronously
-        background_tasks.add_task(
-            lambda b=file_bytes: s3_client.upload_fileobj(
-                io.BytesIO(b),
-                R2_BUCKET,
-                filename,
-                ExtraArgs={"ACL": "public-read", "ContentType": content_type}
-            )
-        )
-
-        image_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{filename}"
-
-    new_item = Item(id=id, barcode=barcode, name=name, image_url=image_url)
+    new_item = Item(
+        id=id,
+        category=category,
+        name=name,
+        color=color,
+        height=height,
+        width=width,
+        depth=depth,
+        material=material,
+        cost=cost,
+        price=price,
+    )
     db.add(new_item)
     db.commit()
-    db.refresh(new_item)
-    db.close()
+    return RedirectResponse(url="/display", status_code=303)
 
-    return templates.TemplateResponse("index.html", {"request": request, "message": "Item added!"})
+# Remove/Edit page – step 1: enter ID
+@app.get("/remove-edit", response_class=HTMLResponse)
+def remove_edit_form(request: Request):
+    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "step": "input"})
+
+# Remove/Edit page – step 2: show item by ID
+@app.post("/remove-edit/find", response_class=HTMLResponse)
+def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    categories = ["Electronics", "Furniture", "Clothing", "Other"]
+    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "categories": categories, "step": "edit"})
+
+# Update item
+@app.post("/remove-edit/update", response_class=HTMLResponse)
+def update_item(
+    request: Request,
+    id: int = Form(...),
+    category: str = Form(...),
+    name: str = Form(None),
+    color: str = Form(None),
+    height: float = Form(None),
+    width: float = Form(None),
+    depth: float = Form(None),
+    material: str = Form(None),
+    cost: float = Form(None),
+    price: float = Form(None),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    item.category = category
+    item.name = name
+    item.color = color
+    item.height = height
+    item.width = width
+    item.depth = depth
+    item.material = material
+    item.cost = cost
+    item.price = price
+
+    db.commit()
+    return RedirectResponse(url="/display", status_code=303)
+
+# Delete item
+@app.post("/remove-edit/delete", response_class=HTMLResponse)
+def delete_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)
+    db.commit()
+    return RedirectResponse(url="/display", status_code=303)
