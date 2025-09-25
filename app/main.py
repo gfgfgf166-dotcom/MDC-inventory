@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from typing import Optional
 
 # -------------------
 # Database Setup
@@ -69,48 +70,47 @@ def display_items(request: Request, db: Session = Depends(get_db)):
     items = db.query(Item).all()
     return templates.TemplateResponse("display.html", {"request": request, "items": items})
 
-# Add new item (GET + POST in one route)
+# Add new item (GET + POST in one)
 @app.api_route("/add", methods=["GET", "POST"], response_class=HTMLResponse)
 def add_item(
     request: Request,
     db: Session = Depends(get_db),
-    id: int = Form(None),
-    category: str = Form(None),
-    name: str = Form(None),
-    color: str = Form(None),
-    height: float = Form(None),
-    width: float = Form(None),
-    depth: float = Form(None),
-    material: str = Form(None),
-    cost: float = Form(None),
-    price: float = Form(None),
+    id: Optional[int] = Form(None),
+    category: Optional[str] = Form(None),
+    name: Optional[str] = Form(None),
+    color: Optional[str] = Form(None),
+    height: Optional[float] = Form(None),
+    width: Optional[float] = Form(None),
+    depth: Optional[float] = Form(None),
+    material: Optional[str] = Form(None),
+    cost: Optional[float] = Form(None),
+    price: Optional[float] = Form(None),
 ):
-    if request.method == "GET":
-        # Pre-fill next ID and categories
-        max_id = db.query(Item.id).order_by(Item.id.desc()).first()
-        next_id = (max_id[0] + 1) if max_id else 1
-        categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
-        return templates.TemplateResponse(
-            "add.html",
-            {"request": request, "next_id": next_id, "categories": categories},
-        )
+    if request.method == "POST":
+        if not category:
+            raise HTTPException(status_code=400, detail="Category is required")
 
-    # POST → create item
-    new_item = Item(
-        id=id,
-        category=category,
-        name=name,
-        color=color,
-        height=height,
-        width=width,
-        depth=depth,
-        material=material,
-        cost=cost,
-        price=price,
-    )
-    db.add(new_item)
-    db.commit()
-    return RedirectResponse(url="/display", status_code=303)
+        new_item = Item(
+            id=id,
+            category=category,
+            name=name,
+            color=color,
+            height=height,
+            width=width,
+            depth=depth,
+            material=material,
+            cost=cost,
+            price=price,
+        )
+        db.add(new_item)
+        db.commit()
+        return RedirectResponse(url="/display", status_code=303)
+
+    # GET request → show form
+    max_id = db.query(Item.id).order_by(Item.id.desc()).first()
+    next_id = (max_id[0] + 1) if max_id else 1
+    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
+    return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
 
 # Remove/Edit page – step 1: enter ID
 @app.get("/remove-edit", response_class=HTMLResponse)
@@ -132,14 +132,14 @@ def update_item(
     request: Request,
     id: int = Form(...),
     category: str = Form(...),
-    name: str = Form(None),
-    color: str = Form(None),
-    height: float = Form(None),
-    width: float = Form(None),
-    depth: float = Form(None),
-    material: str = Form(None),
-    cost: float = Form(None),
-    price: float = Form(None),
+    name: Optional[str] = Form(None),
+    color: Optional[str] = Form(None),
+    height: Optional[float] = Form(None),
+    width: Optional[float] = Form(None),
+    depth: Optional[float] = Form(None),
+    material: Optional[str] = Form(None),
+    cost: Optional[float] = Form(None),
+    price: Optional[float] = Form(None),
     db: Session = Depends(get_db),
 ):
     item = db.query(Item).filter(Item.id == id).first()
