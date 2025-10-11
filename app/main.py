@@ -6,7 +6,6 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from typing import Optional
 
 # -------------------
 # Database Setup
@@ -67,31 +66,47 @@ def home(request: Request):
 # Display all items
 @app.get("/display", response_class=HTMLResponse)
 def display_items(request: Request, db: Session = Depends(get_db)):
-    items = db.query(Item).all()
+    try:
+        items = db.query(Item).all()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
     return templates.TemplateResponse("display.html", {"request": request, "items": items})
 
 # Add new item (GET + POST in one)
 @app.api_route("/add", methods=["GET", "POST"], response_class=HTMLResponse)
-def add_item(
-    request: Request,
-    db: Session = Depends(get_db),
-    id: Optional[int] = Form(None),
-    category: Optional[str] = Form(None),
-    name: Optional[str] = Form(None),
-    color: Optional[str] = Form(None),
-    height: Optional[float] = Form(None),
-    width: Optional[float] = Form(None),
-    depth: Optional[float] = Form(None),
-    material: Optional[str] = Form(None),
-    cost: Optional[float] = Form(None),
-    price: Optional[float] = Form(None),
-):
+async def add_item(request: Request, db: Session = Depends(get_db)):
     if request.method == "POST":
+        form = await request.form()
+
+        # Safely convert numeric fields
+        def to_float(value):
+            try:
+                return float(value) if value not in (None, "", "None") else None
+            except ValueError:
+                return None
+
+        def to_int(value):
+            try:
+                return int(value) if value not in (None, "", "None") else None
+            except ValueError:
+                return None
+
+        id_val = to_int(form.get("id"))
+        category = form.get("category")
+        name = form.get("name")
+        color = form.get("color")
+        height = to_float(form.get("height"))
+        width = to_float(form.get("width"))
+        depth = to_float(form.get("depth"))
+        material = form.get("material")
+        cost = to_float(form.get("cost"))
+        price = to_float(form.get("price"))
+
         if not category:
             raise HTTPException(status_code=400, detail="Category is required")
 
         new_item = Item(
-            id=id,
+            id=id_val,
             category=category,
             name=name,
             color=color,
@@ -102,6 +117,7 @@ def add_item(
             cost=cost,
             price=price,
         )
+
         db.add(new_item)
         db.commit()
         return RedirectResponse(url="/display", status_code=303)
@@ -132,14 +148,14 @@ def update_item(
     request: Request,
     id: int = Form(...),
     category: str = Form(...),
-    name: Optional[str] = Form(None),
-    color: Optional[str] = Form(None),
-    height: Optional[float] = Form(None),
-    width: Optional[float] = Form(None),
-    depth: Optional[float] = Form(None),
-    material: Optional[str] = Form(None),
-    cost: Optional[float] = Form(None),
-    price: Optional[float] = Form(None),
+    name: str = Form(None),
+    color: str = Form(None),
+    height: float = Form(None),
+    width: float = Form(None),
+    depth: float = Form(None),
+    material: str = Form(None),
+    cost: float = Form(None),
+    price: float = Form(None),
     db: Session = Depends(get_db),
 ):
     item = db.query(Item).filter(Item.id == id).first()
