@@ -61,7 +61,22 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    """Home page now includes a search form."""
+    return templates.TemplateResponse("index.html", {"request": request, "item": None, "error": None})
+
+# Search item by ID
+@app.post("/search", response_class=HTMLResponse)
+def search_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request, "item": None, "error": f"No item found with ID {id}."},
+        )
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "item": item, "error": None},
+    )
 
 # Display all items
 @app.get("/display", response_class=HTMLResponse)
@@ -72,13 +87,12 @@ def display_items(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     return templates.TemplateResponse("display.html", {"request": request, "items": items})
 
-# Add new item (GET + POST in one)
+# Add new item (GET + POST)
 @app.api_route("/add", methods=["GET", "POST"], response_class=HTMLResponse)
 async def add_item(request: Request, db: Session = Depends(get_db)):
     if request.method == "POST":
         form = await request.form()
 
-        # Safely convert numeric fields
         def to_float(value):
             try:
                 return float(value) if value not in (None, "", "None") else None
@@ -122,18 +136,16 @@ async def add_item(request: Request, db: Session = Depends(get_db)):
         db.commit()
         return RedirectResponse(url="/display", status_code=303)
 
-    # GET request → show form
     max_id = db.query(Item.id).order_by(Item.id.desc()).first()
     next_id = (max_id[0] + 1) if max_id else 1
     categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
     return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
 
-# Remove/Edit page – step 1: enter ID
+# Remove/Edit page
 @app.get("/remove-edit", response_class=HTMLResponse)
 def remove_edit_form(request: Request):
     return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "step": "input"})
 
-# Remove/Edit page – step 2: show item by ID
 @app.post("/remove-edit/find", response_class=HTMLResponse)
 def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.id == id).first()
@@ -142,7 +154,6 @@ def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_d
     categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
     return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "categories": categories, "step": "edit"})
 
-# Update item
 @app.post("/remove-edit/update", response_class=HTMLResponse)
 def update_item(
     request: Request,
@@ -175,7 +186,6 @@ def update_item(
     db.commit()
     return RedirectResponse(url="/display", status_code=303)
 
-# Delete item
 @app.post("/remove-edit/delete", response_class=HTMLResponse)
 def delete_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.id == id).first()
