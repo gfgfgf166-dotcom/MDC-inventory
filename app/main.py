@@ -106,7 +106,7 @@ def display_items(request: Request, db: Session = Depends(get_db)):
         barcode_path = generate_barcode(i.id)
         item_data.append({"item": i, "barcode": barcode_path})
 
-    return templates.TemplateResponse("display.html", {"request": request, "item_data": item_data})
+    return templates.TemplateResponse("display.html", {"request": request, "items": items})
 
 # Add new item
 @app.api_route("/add", methods=["GET", "POST"], response_class=HTMLResponse)
