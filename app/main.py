@@ -1,11 +1,13 @@
 import os
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+import barcode
+from barcode.writer import ImageWriter
 
 # -------------------
 # Database Setup
@@ -44,6 +46,8 @@ Base.metadata.create_all(bind=engine)
 # -------------------
 app = FastAPI()
 
+# Static folders
+os.makedirs("app/static/barcodes", exist_ok=True)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
@@ -56,12 +60,21 @@ def get_db():
         db.close()
 
 # -------------------
+# Helper – Generate barcode if not exists
+# -------------------
+def generate_barcode(item_id: int):
+    path = f"app/static/barcodes/{item_id}.png"
+    if not os.path.exists(path):
+        code = barcode.get("code128", str(item_id), writer=ImageWriter())
+        code.save(path[:-4])  # python-barcode auto-adds .png
+    return f"/static/barcodes/{item_id}.png"
+
+# -------------------
 # Routes
 # -------------------
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    """Home page now includes a search form."""
     return templates.TemplateResponse("index.html", {"request": request, "item": None, "error": None})
 
 # Search item by ID
@@ -73,9 +86,10 @@ def search_item(request: Request, id: int = Form(...), db: Session = Depends(get
             "index.html",
             {"request": request, "item": None, "error": f"No item found with ID {id}."},
         )
+    barcode_path = generate_barcode(item.id)
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "item": item, "error": None},
+        {"request": request, "item": item, "error": None, "barcode_path": barcode_path},
     )
 
 # Display all items
@@ -85,9 +99,16 @@ def display_items(request: Request, db: Session = Depends(get_db)):
         items = db.query(Item).all()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    return templates.TemplateResponse("display.html", {"request": request, "items": items})
 
-# Add new item (GET + POST)
+    # Generate barcodes for all items
+    item_data = []
+    for i in items:
+        barcode_path = generate_barcode(i.id)
+        item_data.append({"item": i, "barcode": barcode_path})
+
+    return templates.TemplateResponse("display.html", {"request": request, "item_data": item_data})
+
+# Add new item
 @app.api_route("/add", methods=["GET", "POST"], response_class=HTMLResponse)
 async def add_item(request: Request, db: Session = Depends(get_db)):
     if request.method == "POST":
@@ -134,63 +155,12 @@ async def add_item(request: Request, db: Session = Depends(get_db)):
 
         db.add(new_item)
         db.commit()
+
+        # Generate barcode
+        generate_barcode(new_item.id)
         return RedirectResponse(url="/display", status_code=303)
 
     max_id = db.query(Item.id).order_by(Item.id.desc()).first()
     next_id = (max_id[0] + 1) if max_id else 1
     categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
     return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
-
-# Remove/Edit page
-@app.get("/remove-edit", response_class=HTMLResponse)
-def remove_edit_form(request: Request):
-    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "step": "input"})
-
-@app.post("/remove-edit/find", response_class=HTMLResponse)
-def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
-    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "categories": categories, "step": "edit"})
-
-@app.post("/remove-edit/update", response_class=HTMLResponse)
-def update_item(
-    request: Request,
-    id: int = Form(...),
-    category: str = Form(...),
-    name: str = Form(None),
-    color: str = Form(None),
-    height: float = Form(None),
-    width: float = Form(None),
-    depth: float = Form(None),
-    material: str = Form(None),
-    cost: float = Form(None),
-    price: float = Form(None),
-    db: Session = Depends(get_db),
-):
-    item = db.query(Item).filter(Item.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-
-    item.category = category
-    item.name = name
-    item.color = color
-    item.height = height
-    item.width = width
-    item.depth = depth
-    item.material = material
-    item.cost = cost
-    item.price = price
-
-    db.commit()
-    return RedirectResponse(url="/display", status_code=303)
-
-@app.post("/remove-edit/delete", response_class=HTMLResponse)
-def delete_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    db.delete(item)
-    db.commit()
-    return RedirectResponse(url="/display", status_code=303)

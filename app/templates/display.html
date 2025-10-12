@@ -21,6 +21,7 @@
             <th>Material</th>
             <th>Cost</th>
             <th>Price</th>
+			<th>Barcode</th>
         </tr>
         {% for item in items %}
         <tr>
@@ -34,6 +35,12 @@
             <td>{{ item.material }}</td>
             <td>{{ item.cost }}</td>
             <td>{{ item.price }}</td>
+			<td>{{ row.item.id }}</td>
+			<td>{{ row.item.category }}</td>
+			<td>{{ row.item.name or "—" }}</td>
+			<td>{{ row.item.color or "—" }}</td>
+			<td><img src="{{ row.barcode }}" alt="Barcode" width="120"></td>
+
         </tr>
         {% endfor %}
     </table>
