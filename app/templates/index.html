@@ -15,6 +15,7 @@
         a { margin: 10px; display: inline-block; color: #0078D7; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .error { color: red; margin-top: 10px; }
+        .barcode img { width: 180px; height: auto; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -51,10 +52,26 @@
     </table>
 
     {% if barcode_path %}
-        <h4>Item Barcode</h4>
-        <img src="{{ barcode_path }}" alt="Barcode for item {{ item.id }}" style="margin-top:10px;">
+        <div class="barcode">
+            <h4>Item Barcode</h4>
+            <img id="barcode-{{ item.id }}" src="{{ barcode_path }}" alt="Barcode for item {{ item.id }}">
+            <br>
+            <button onclick="printBarcode('barcode-{{ item.id }}')">Print Barcode</button>
+        </div>
     {% endif %}
-{% endif %}
+    {% endif %}
 
+    <script>
+    function printBarcode(barcodeId) {
+        const barcode = document.getElementById(barcodeId);
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write('<html><head><title>Print Barcode</title></head><body style="text-align:center;">');
+        printWindow.document.write('<h2>Item Barcode</h2>');
+        printWindow.document.write(barcode.outerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+    </script>
 </body>
 </html>

@@ -164,3 +164,56 @@ async def add_item(request: Request, db: Session = Depends(get_db)):
     next_id = (max_id[0] + 1) if max_id else 1
     categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
     return templates.TemplateResponse("add.html", {"request": request, "next_id": next_id, "categories": categories})
+# Remove/Edit page
+@app.get("/remove-edit", response_class=HTMLResponse)
+def remove_edit_form(request: Request):
+    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": None, "step": "input"})
+
+@app.post("/remove-edit/find", response_class=HTMLResponse)
+def find_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    categories = ["Art", "Vessels", "Textiles", "Tableware", "Holiday", "Misc."]
+    return templates.TemplateResponse("remove_edit.html", {"request": request, "item": item, "categories": categories, "step": "edit"})
+
+@app.post("/remove-edit/update", response_class=HTMLResponse)
+def update_item(
+    request: Request,
+    id: int = Form(...),
+    category: str = Form(...),
+    name: str = Form(None),
+    color: str = Form(None),
+    height: float = Form(None),
+    width: float = Form(None),
+    depth: float = Form(None),
+    material: str = Form(None),
+    cost: float = Form(None),
+    price: float = Form(None),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    item.category = category
+    item.name = name
+    item.color = color
+    item.height = height
+    item.width = width
+    item.depth = depth
+    item.material = material
+    item.cost = cost
+    item.price = price
+
+    db.commit()
+    return RedirectResponse(url="/display", status_code=303)
+
+@app.post("/remove-edit/delete", response_class=HTMLResponse)
+def delete_item(request: Request, id: int = Form(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)
+    db.commit()
+    return RedirectResponse(url="/display", status_code=303)
