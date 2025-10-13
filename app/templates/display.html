@@ -13,30 +13,30 @@
     <h1>Current Inventory</h1>
     <table>
         <tr>
-            <th>ID</th>
-            <th>Category</th>
-            <th>Name</th>
-            <th>Color</th>
-            <th>Height</th>
-            <th>Width</th>
-            <th>Depth</th>
-            <th>Material</th>
-            <th>Cost</th>
-            <th>Price</th>
-            <th>Barcode</th>
+            <th>id</th>
+            <th>category</th>
+            <th>name</th>
+            <th>color</th>
+            <th>height</th>
+            <th>width</th>
+            <th>depth</th>
+            <th>material</th>
+            <th>cost</th>
+            <th>price</th>
+            <th>barcode</th>
         </tr>
         {% for item in items %}
         <tr>
-            <td>{{ item.ID }}</td>
-            <td>{{ item.Category }}</td>
-            <td>{{ item.Name }}</td>
-            <td>{{ item.Color }}</td>
-            <td>{{ item.Height }}</td>
-            <td>{{ item.Width }}</td>
-            <td>{{ item.Depth }}</td>
-            <td>{{ item.Material }}</td>
-            <td>{{ item.Cost }}</td>
-            <td>{{ item.Price }}</td>
+            <td>{{ item.id }}</td>
+            <td>{{ item.category }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.color }}</td>
+            <td>{{ item.height }}</td>
+            <td>{{ item.width }}</td>
+            <td>{{ item.depth }}</td>
+            <td>{{ item.material }}</td>
+            <td>{{ item.cost }}</td>
+            <td>{{ item.price }}</td>
             <td>
                 {% if item.Barcode and item.Barcode != "" %}
                     <img src="{{ url_for('static', path='barcodes/' + item.Barcode) }}" alt="Barcode">
