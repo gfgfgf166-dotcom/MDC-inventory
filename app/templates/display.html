@@ -1,51 +1,110 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Inventory Display</title>
+    <title>Inventory List</title>
     <style>
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; }
-        img { height: 60px; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            padding: 30px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background: white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        img {
+            width: 150px;
+            height: auto;
+        }
+        a {
+            margin-right: 15px;
+        }
+        .barcode {
+            text-align: center;
+        }
+        .print-btn {
+            background-color: #0078D7;
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .print-btn:hover {
+            background-color: #005fa3;
+        }
     </style>
+    <script>
+        function printBarcode(id) {
+            const printWindow = window.open('', '_blank');
+            const img = document.getElementById('barcode-' + id).src;
+            printWindow.document.write('<html><head><title>Print Barcode</title></head><body style="text-align:center;">');
+            printWindow.document.write('<h2>Barcode for Item ID: ' + id + '</h2>');
+            printWindow.document.write('<img src="' + img + '" style="width:250px;"/>');
+            printWindow.document.write('<br><button onclick="window.print()">Print</button>');
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+        }
+    </script>
 </head>
 <body>
     <h1>Current Inventory</h1>
+    <a href="/">Home</a> | 
+    <a href="/add">Add New Item</a> | 
+    <a href="/remove-edit">Remove/Edit Item</a>
+
+    {% if items %}
     <table>
         <tr>
-            <th>id</th>
-            <th>category</th>
-            <th>name</th>
-            <th>color</th>
-            <th>height</th>
-            <th>width</th>
-            <th>depth</th>
-            <th>material</th>
-            <th>cost</th>
-            <th>price</th>
-            <th>barcode</th>
+            <th>ID</th>
+            <th>Category</th>
+            <th>Name</th>
+            <th>Color</th>
+            <th>Height</th>
+            <th>Width</th>
+            <th>Depth</th>
+            <th>Material</th>
+            <th>Cost</th>
+            <th>Price</th>
+            <th>Barcode</th>
         </tr>
         {% for item in items %}
         <tr>
             <td>{{ item.id }}</td>
-            <td>{{ item.category }}</td>
-            <td>{{ item.name }}</td>
-            <td>{{ item.color }}</td>
-            <td>{{ item.height }}</td>
-            <td>{{ item.width }}</td>
-            <td>{{ item.depth }}</td>
-            <td>{{ item.material }}</td>
-            <td>{{ item.cost }}</td>
-            <td>{{ item.price }}</td>
-            <td>
-                {% if item.Barcode and item.Barcode != "" %}
-                    <img src="{{ url_for('static', path='barcodes/' + item.Barcode) }}" alt="Barcode">
+            <td>{{ item.category or "—" }}</td>
+            <td>{{ item.name or "—" }}</td>
+            <td>{{ item.color or "—" }}</td>
+            <td>{{ item.height or "—" }}</td>
+            <td>{{ item.width or "—" }}</td>
+            <td>{{ item.depth or "—" }}</td>
+            <td>{{ item.material or "—" }}</td>
+            <td>{{ item.cost or "—" }}</td>
+            <td>{{ item.price or "—" }}</td>
+            <td class="barcode">
+                {% if item.barcode_path %}
+                    <img id="barcode-{{ item.id }}" src="{{ url_for('static', path=item.barcode_path) }}" alt="Barcode">
                     <br>
-                    <button onclick="window.print()">Print</button>
+                    <button class="print-btn" onclick="printBarcode({{ item.id }})">Print Barcode</button>
+                {% else %}
+                    No Barcode
                 {% endif %}
             </td>
         </tr>
         {% endfor %}
     </table>
+    {% else %}
+        <p>No items found in the database.</p>
+    {% endif %}
 </body>
 </html>

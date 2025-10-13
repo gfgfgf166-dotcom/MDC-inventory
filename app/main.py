@@ -92,7 +92,6 @@ def search_item(request: Request, id: int = Form(...), db: Session = Depends(get
         {"request": request, "item": item, "error": None, "barcode_path": barcode_path},
     )
 
-# Display all items
 @app.get("/display", response_class=HTMLResponse)
 def display_items(request: Request, db: Session = Depends(get_db)):
     try:
@@ -100,13 +99,29 @@ def display_items(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
-    # Generate barcodes for all items
     item_data = []
     for i in items:
-        barcode_path = generate_barcode(i.id)
-        item_data.append({"item": i, "barcode": barcode_path})
+        # Generate barcode if not exists
+        barcode_filename = f"barcode_{i.id}.png"
+        barcode_path = os.path.join("static", "barcodes", barcode_filename)
+        if not os.path.exists(barcode_path):
+            generate_barcode(i.id)
+        item_data.append({
+            "id": i.id,
+            "category": i.category,
+            "name": i.name,
+            "color": i.color,
+            "height": i.height,
+            "width": i.width,
+            "depth": i.depth,
+            "material": i.material,
+            "cost": i.cost,
+            "price": i.price,
+            "barcode_path": f"barcodes/{barcode_filename}"
+        })
 
-    return templates.TemplateResponse("display.html", {"request": request, "items": items})
+    return templates.TemplateResponse("display.html", {"request": request, "items": item_data})
+
 
 # Add new item
 @app.api_route("/add", methods=["GET", "POST"], response_class=HTMLResponse)
