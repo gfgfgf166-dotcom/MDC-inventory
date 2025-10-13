@@ -23,7 +23,7 @@
             background-color: #f0f0f0;
         }
         img {
-            width: 150px;
+            width: 100px;
             height: auto;
         }
         a {
@@ -50,8 +50,7 @@
             const printWindow = window.open('', '_blank');
             const img = document.getElementById('barcode-' + id).src;
             printWindow.document.write('<html><head><title>Print Barcode</title></head><body style="text-align:center;">');
-            printWindow.document.write('<h2>Barcode for Item ID: ' + id + '</h2>');
-            printWindow.document.write('<img src="' + img + '" style="width:250px;"/>');
+            printWindow.document.write('<img src="' + img + '" style="width:100px;"/>');
             printWindow.document.write('<br><button onclick="window.print()">Print</button>');
             printWindow.document.write('</body></html>');
             printWindow.document.close();
