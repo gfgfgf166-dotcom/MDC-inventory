@@ -63,11 +63,22 @@ def get_db():
 # Helper – Generate barcode if not exists
 # -------------------
 def generate_barcode(item_id: int):
-    path = f"app/static/barcodes/{item_id}.png"
-    if not os.path.exists(path):
+    # Always generate into the same folder served by FastAPI
+    barcode_dir = os.path.join("app", "static", "barcodes")
+    os.makedirs(barcode_dir, exist_ok=True)
+
+    filename = f"barcode_{item_id}.png"
+    filepath = os.path.join(barcode_dir, filename)
+
+    # Only generate if missing
+    if not os.path.exists(filepath):
         code = barcode.get("code128", str(item_id), writer=ImageWriter())
-        code.save(path[:-4])  # python-barcode auto-adds .png
-    return f"/static/barcodes/{item_id}.png"
+        # python-barcode automatically appends .png when saving, so strip it before calling save()
+        code.save(filepath[:-4])
+
+    # Return relative path used by templates
+    return f"/static/barcodes/{filename}"
+
 
 # -------------------
 # Routes
