@@ -34,6 +34,7 @@ class Item(Base):
     height = Column(Float, nullable=True)
     width = Column(Float, nullable=True)
     depth = Column(Float, nullable=True)
+    weight = Column(Float, nullable=True)
     material = Column(String, nullable=True)
     cost = Column(Float, nullable=True)
     price = Column(Float, nullable=True)
@@ -125,6 +126,7 @@ def display_items(request: Request, db: Session = Depends(get_db)):
             "height": i.height,
             "width": i.width,
             "depth": i.depth,
+            "weight": i.weight
             "material": i.material,
             "cost": i.cost,
             "price": i.price,
@@ -159,6 +161,7 @@ async def add_item(request: Request, db: Session = Depends(get_db)):
         height = to_float(form.get("height"))
         width = to_float(form.get("width"))
         depth = to_float(form.get("depth"))
+        weight = to_float(form.get("weight"))
         material = form.get("material")
         cost = to_float(form.get("cost"))
         price = to_float(form.get("price"))
@@ -174,6 +177,7 @@ async def add_item(request: Request, db: Session = Depends(get_db)):
             height=height,
             width=width,
             depth=depth,
+            weight=weight,
             material=material,
             cost=cost,
             price=price,
@@ -213,6 +217,7 @@ def update_item(
     height: float = Form(None),
     width: float = Form(None),
     depth: float = Form(None),
+    weight: float = Form(None),
     material: str = Form(None),
     cost: float = Form(None),
     price: float = Form(None),
@@ -228,6 +233,7 @@ def update_item(
     item.height = height
     item.width = width
     item.depth = depth
+    item.weight = weight
     item.material = material
     item.cost = cost
     item.price = price
