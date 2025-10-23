@@ -126,7 +126,7 @@ def display_items(request: Request, db: Session = Depends(get_db)):
             "height": i.height,
             "width": i.width,
             "depth": i.depth,
-            "weight": i.weight
+            "weight": i.weight,
             "material": i.material,
             "cost": i.cost,
             "price": i.price,
